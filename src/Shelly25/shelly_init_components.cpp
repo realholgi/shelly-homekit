@@ -21,12 +21,26 @@
 #include "shelly_hap_input.hpp"
 #include "shelly_hap_window_covering.hpp"
 #include "shelly_main.hpp"
+#include "shelly_switch.hpp"
 
 namespace shelly {
 
 void CreateComponents(std::vector<std::unique_ptr<Component>> *comps,
                       std::vector<std::unique_ptr<mgos::hap::Accessory>> *accs,
                       HAPAccessoryServerRef *svr) {
+  CreateHAPSwitch(1, mgos_sys_config_get_sw1(), mgos_sys_config_get_in1(),
+                  comps, accs, svr, false);
+  if (mgos_sys_config_get_sw1_in_mode() == (int) InMode::kEdgeBoth ||
+      mgos_sys_config_get_sw1_in_mode() == (int) InMode::kActivationBoth) {
+    ShellySwitch *sw = reinterpret_cast<ShellySwitch *>(comps->back().get());
+    sw->AddInput(FindInput(2));
+    LOG(LL_INFO, ("Added extra input"));
+  }
+}
+
+void CreateComponents2(std::vector<std::unique_ptr<Component>> *comps,
+                       std::vector<std::unique_ptr<mgos::hap::Accessory>> *accs,
+                       HAPAccessoryServerRef *svr) {
   // Roller-shutter mode.
   if (mgos_sys_config_get_shelly_mode() == 1) {
     const int id = 1;

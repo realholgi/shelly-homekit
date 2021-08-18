@@ -78,14 +78,15 @@ StatusOr<std::string> ShellySwitch::GetInfo() const {
 }
 
 StatusOr<std::string> ShellySwitch::GetInfoJSON() const {
+  const bool hdim = (SHELLY_HAVE_DUAL_INPUT_MODES ? true : false);
   std::string res = mgos::JSONPrintStringf(
       "{id: %d, type: %d, name: %Q, svc_type: %d, valve_type: %d, in_mode: %d, "
       "in_inverted: %B, initial: %d, state: %B, auto_off: %B, "
-      "auto_off_delay: %.3f, state_led_en: %d, out_inverted: %B",
+      "auto_off_delay: %.3f, state_led_en: %d, out_inverted: %B, hdim: %B",
       id(), type(), (cfg_->name ? cfg_->name : ""), cfg_->svc_type,
       cfg_->valve_type, cfg_->in_mode, cfg_->in_inverted, cfg_->initial_state,
       out_->GetState(), cfg_->auto_off, cfg_->auto_off_delay,
-      cfg_->state_led_en, cfg_->out_inverted);
+      cfg_->state_led_en, cfg_->out_inverted, hdim);
   if (out_pm_ != nullptr) {
     auto power = out_pm_->GetPowerW();
     if (power.ok()) {
@@ -161,7 +162,14 @@ Status ShellySwitch::SetConfig(const std::string &config_json,
   }
   if (cfg.in_mode != -2 && cfg_->in_mode != cfg.in_mode) {
     if (cfg_->in_mode == (int) InMode::kDetached ||
-        cfg.in_mode == (int) InMode::kDetached) {
+        cfg.in_mode == (int) InMode::kDetached ||
+#if SHELLY_HAVE_DUAL_INPUT_MODES
+        cfg.in_mode == (int) InMode::kEdgeBoth ||
+        cfg_->in_mode == (int) InMode::kEdgeBoth ||
+        cfg.in_mode == (int) InMode::kActivationBoth ||
+        cfg_->in_mode == (int) InMode::kActivationBoth ||
+#endif
+        false) {
       *restart_required = true;
     }
     cfg_->in_mode = cfg.in_mode;
@@ -318,9 +326,15 @@ void ShellySwitch::InputEventHandler(Input::Event ev, bool state) {
           SetOutputState(state, "switch");
           break;
         case InMode::kEdge:
+#if SHELLY_HAVE_DUAL_INPUT_MODES
+        case InMode::kEdgeBoth:
+#endif
           SetOutputState(!out_->GetState(), "ext_edge");
           break;
         case InMode::kActivation:
+#if SHELLY_HAVE_DUAL_INPUT_MODES
+        case InMode::kActivationBoth:
+#endif
           if (state) {
             SetOutputState(true, "ext_act");
           } else if (GetOutputState() && cfg_->auto_off) {
