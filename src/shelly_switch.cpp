@@ -45,7 +45,7 @@ const HAPUUID kHAPCharacteristic_EveTotalConsumption = {
 ShellySwitch::ShellySwitch(int id, Input *in, Output *out, PowerMeter *out_pm,
                            Output *led_out, struct mgos_config_sw *cfg)
     : Component(id),
-      in_(in),
+      ins_(in ? std::vector<Input *>{in} : std::vector<Input *>{}),
       out_(out),
       led_out_(led_out),
       out_pm_(out_pm),
@@ -55,8 +55,8 @@ ShellySwitch::ShellySwitch(int id, Input *in, Output *out, PowerMeter *out_pm,
 }
 
 ShellySwitch::~ShellySwitch() {
-  if (in_ != nullptr) {
-    in_->RemoveHandler(handler_id_);
+  for (size_t i = 0; i < in_handler_ids_.size(); i++) {
+    ins_[i]->RemoveHandler(in_handler_ids_[i]);
   }
   SaveState();
 }
@@ -71,7 +71,7 @@ std::string ShellySwitch::name() const {
 
 StatusOr<std::string> ShellySwitch::GetInfo() const {
   int in_st = -1;
-  if (in_ != nullptr) in_st = in_->GetState();
+  if (!ins_.empty()) in_st = GetInputState();
   const_cast<ShellySwitch *>(this)->SaveState();
   return mgos::SPrintf("st:%d in_st:%d inm:%d ininv:%d", out_->GetState(),
                        in_st, cfg_->in_mode, cfg_->in_inverted);
@@ -203,10 +203,11 @@ Status ShellySwitch::Init() {
     LOG(LL_INFO, ("'%s' is disabled", cfg_->name));
     return Status::OK();
   }
-  if (in_ != nullptr) {
-    handler_id_ = in_->AddHandler(
+  for (Input *in : ins_) {
+    auto handler_id = in->AddHandler(
         std::bind(&ShellySwitch::InputEventHandler, this, _1, _2));
-    in_->SetInvert(cfg_->in_inverted);
+    in->SetInvert(cfg_->in_inverted);
+    in_handler_ids_.push_back(handler_id);
   }
   out_->SetInvert(cfg_->out_inverted);
   bool should_restore = (cfg_->initial_state == (int) InitialState::kLast);
@@ -222,9 +223,9 @@ Status ShellySwitch::Init() {
         SetOutputState(true, "init");
         break;
       case InitialState::kInput:
-        if (in_ != nullptr &&
+        if (!ins_.empty() &&
             cfg_->in_mode == static_cast<int>(InMode::kToggle)) {
-          SetOutputState(in_->GetState(), "init");
+          SetOutputState(GetInputState(), "init");
         }
         break;
       case InitialState::kLast:
@@ -269,7 +270,7 @@ void ShellySwitch::AutoOffTimerCB() {
   // Don't set state if auto off has been disabled during timer run
   if (!cfg_->auto_off) return;
   if (static_cast<InMode>(cfg_->in_mode) == InMode::kActivation &&
-      in_ != nullptr && in_->GetState() && GetOutputState()) {
+      !ins_.empty() && GetInputState() && GetOutputState()) {
     // Input is active, re-arm.
     LOG(LL_INFO, ("Input is active, re-arming auto off timer"));
     auto_off_timer_.Reset(cfg_->auto_off_delay * 1000, 0);
@@ -282,6 +283,21 @@ void ShellySwitch::SaveState() {
   if (!dirty_) return;
   mgos_sys_config_save(&mgos_sys_config, false /* try_once */, NULL /* msg */);
   dirty_ = false;
+}
+
+void ShellySwitch::AddInput(Input *in) {
+  auto handler_id =
+      in->AddHandler(std::bind(&ShellySwitch::InputEventHandler, this, _1, _2));
+  in->SetInvert(cfg_->in_inverted);
+  ins_.push_back(in);
+  in_handler_ids_.push_back(handler_id);
+}
+
+bool ShellySwitch::GetInputState() const {
+  for (Input *in : ins_) {
+    if (in->GetState()) return true;
+  }
+  return false;
 }
 
 void ShellySwitch::InputEventHandler(Input::Event ev, bool state) {

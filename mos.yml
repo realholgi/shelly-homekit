@@ -1,6 +1,6 @@
 author: Shelly-HomeKit contributors
 description: A HomeKit firmware for Shelly switches
-version: 2.9.5
+version: 2.9.5-twoinputs1
 platform: esp8266
 
 libs_version: latest
@@ -205,15 +205,9 @@ conds:
         - ["in1", "in", {title: "Input 1 settings"}]
         - ["in1.ssw.name", "Shelly SSW1"]
         - ["in1.sensor.name", "Shelly S1"]
-        - ["in2", "in", {title: "Input 2 settings"}]
-        - ["in2.ssw.name", "Shelly SSW2"]
-        - ["in2.sensor.name", "Shelly S2"]
         # Only for backward compatibility (config <= v3).
         - ["ssw1", "ssw", {title: "SSW1 settings"}]
         - ["ssw1.name", "Input 1"]
-        - ["ssw2", "ssw", {title: "SSW2 settings"}]
-        - ["ssw2.name", "Input 2"]
-
 
   - when: build_vars.MODEL == "Shelly1PM"
     apply:

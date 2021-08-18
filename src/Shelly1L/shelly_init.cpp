@@ -20,6 +20,7 @@
 #include "shelly_main.hpp"
 #include "shelly_noisy_input_pin.hpp"
 #include "shelly_pm_bl0937.hpp"
+#include "shelly_switch.hpp"
 #include "shelly_temp_sensor_ntc.hpp"
 
 namespace shelly {
@@ -52,7 +53,8 @@ void CreateComponents(std::vector<std::unique_ptr<Component>> *comps,
                       HAPAccessoryServerRef *svr) {
   CreateHAPSwitch(1, mgos_sys_config_get_sw1(), mgos_sys_config_get_in1(),
                   comps, accs, svr, false);
-  hap::CreateHAPInput(2, mgos_sys_config_get_in2(), comps, accs, svr);
+  ShellySwitch *sw = reinterpret_cast<ShellySwitch *>(comps->back().get());
+  sw->AddInput(FindInput(2));
 }
 
 }  // namespace shelly
