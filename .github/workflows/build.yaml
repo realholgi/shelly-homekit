@@ -5,6 +5,22 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        model:
+          - Shelly1
+          - Shelly1L
+          - Shelly1PM
+          - Shelly25
+          - Shelly2
+          - ShellyI3
+          - ShellyPlug
+          - ShellyPlugS
+          - ShellyPlus1
+          - ShellyPlus1PM
+          - ShellyRGBW2
+    name: Build ${{ matrix.model }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -15,11 +31,11 @@ jobs:
           sudo add-apt-repository -y ppa:mongoose-os/mos
           sudo apt -q install -y mos-latest
       - name: Build project
-        run: make release RELEASE_SUFFIX=$(.github/version.py --suffix)
+        run: make ${{ matrix.model }} CLEAN=1 RELEASE=1 RELEASE_SUFFIX=$(.github/version.py --suffix)
       - name: Upload build artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: releases
+          name: ${{ matrix.model }}
           path: |
             releases/*
             !releases/**/elf
